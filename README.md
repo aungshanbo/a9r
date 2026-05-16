@@ -5,6 +5,8 @@ A fast terminal UI for managing AWS resources.
 ## Features
 
 - EC2 instance viewer
+- S3 bucket viewer
+- Resource Json viewer
 - Live search filtering
 - Auto refresh
 - Vim-style navigation
@@ -40,7 +42,7 @@ go run .
 | Key | Action |
 |-----|--------|
 | TAB | switch focus |
-| j/k | move |
+| j | json |
 | / | search |
 | r | refresh |
 | a | auto refresh |
