@@ -10,20 +10,12 @@ import (
 )
 
 func BindTableKeys(
-	app *tview.Application,
-	form *tview.Form,
 	table *tview.Table,
 ) {
 
 	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 
 		switch {
-
-		// switch focus
-		case event.Key() == tcell.KeyTAB:
-
-			app.SetFocus(form)
-			return nil
 
 		// allow "/" to global handler
 		case event.Rune() == '/':
@@ -52,14 +44,17 @@ func BindTableKeys(
 func BindGlobalKeys(
 	app *tview.Application,
 	table *tview.Table,
+	profileDropDown *tview.DropDown,
+	regionDropDown *tview.DropDown,
+	resourceDropDown *tview.DropDown,
 	statusBar *tview.TextView,
 	statusView *tview.TextView,
 	state *models.AppState,
 	selectedProfile *string,
 	selectedRegion *string,
+	selectedResource *string,
 	autoRefresh *bool,
 ) {
-
 	searchMode := false
 	var searchTimer *time.Timer
 	// ==========================================
@@ -150,6 +145,7 @@ func BindGlobalKeys(
 				state,
 				*selectedProfile,
 				*selectedRegion,
+				*selectedResource,
 			)
 		}
 	}
@@ -157,6 +153,33 @@ func BindGlobalKeys(
 	updateStatusBar()
 
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		// ==========================================
+		// TAB switch
+		// ==========================================
+
+		focusables := []tview.Primitive{
+			profileDropDown,
+			regionDropDown,
+			resourceDropDown,
+			table,
+		}
+
+		if event.Key() == tcell.KeyTAB {
+
+			current := app.GetFocus()
+
+			for i, item := range focusables {
+
+				if current == item {
+
+					next := (i + 1) % len(focusables)
+
+					app.SetFocus(focusables[next])
+
+					return nil
+				}
+			}
+		}
 
 		// ==========================================
 		// SEARCH MODE
@@ -259,6 +282,7 @@ func BindGlobalKeys(
 					state,
 					*selectedProfile,
 					*selectedRegion,
+					*selectedResource,
 				)
 			}
 
@@ -297,6 +321,7 @@ func BindGlobalKeys(
 					state,
 					*selectedProfile,
 					*selectedRegion,
+					*selectedResource,
 				)
 			}
 
@@ -314,6 +339,7 @@ func StartAutoRefresh(
 	state *models.AppState,
 	selectedProfile *string,
 	selectedRegion *string,
+	selectedResource *string,
 	autoRefresh *bool,
 ) {
 
@@ -334,6 +360,7 @@ func StartAutoRefresh(
 					state,
 					*selectedProfile,
 					*selectedRegion,
+					*selectedResource,
 				)
 			}
 		}

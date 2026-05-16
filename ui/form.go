@@ -12,134 +12,141 @@ func NewForm(
 	regions []string,
 	selectedProfile *string,
 	selectedRegion *string,
+	selectedResource *string,
 ) (
 	tview.Primitive,
-	*tview.Form,
+	*tview.DropDown,
+	*tview.DropDown,
+	*tview.DropDown,
 	*tview.TextView,
 ) {
 
-	// ==========================================
-	// GLOBAL STYLE
-	// ==========================================
-	tview.Styles.PrimaryTextColor = tcell.ColorWhite
-	tview.Styles.ContrastBackgroundColor = tcell.ColorBlack
-
-	// ==========================================
-	// FORM
-	// ==========================================
-	form := tview.NewForm()
-
-	form.SetFieldTextColor(tcell.ColorWhite)
-	form.SetFieldBackgroundColor(tcell.ColorBlack)
-
-	form.SetLabelColor(tcell.ColorWhite)
-
-	form.SetBorderColor(tcell.ColorWhite)
-	form.SetTitleColor(tcell.ColorWhite)
-
-	form.SetButtonBackgroundColor(tcell.ColorBlack)
-	form.SetButtonTextColor(tcell.ColorWhite)
-
-	dropdownOpen := false
-
-	// ==========================================
+	// ==================================================
 	// PROFILE
-	// ==========================================
-	form.AddDropDown(
-		"Profile : ",
+	// ==================================================
+
+	profileDropDown := tview.NewDropDown()
+
+	profileDropDown.SetLabel("Profile : ")
+	profileDropDown.SetOptions(
 		profiles,
-		0,
 		func(option string, index int) {
 			*selectedProfile = option
 		},
 	)
 
-	// ==========================================
+	profileDropDown.SetCurrentOption(0)
+
+	if len(profiles) > 0 {
+		*selectedProfile = profiles[0]
+	}
+
+	// ==================================================
 	// REGION
-	// ==========================================
-	form.AddDropDown(
-		"Region  : ",
+	// ==================================================
+
+	regionDropDown := tview.NewDropDown()
+
+	regionDropDown.SetLabel("Region  : ")
+	regionDropDown.SetOptions(
 		regions,
-		0,
 		func(option string, index int) {
 			*selectedRegion = option
 		},
 	)
 
-	// ==========================================
-	// STATUS VIEW
-	// ==========================================
+	regionDropDown.SetCurrentOption(0)
+
+	if len(regions) > 0 {
+		*selectedRegion = regions[0]
+	}
+
+	// ==================================================
+	// RESOURCE
+	// ==================================================
+
+	resourceOptions := []string{
+		"EC2",
+		"S3",
+	}
+
+	resourceDropDown := tview.NewDropDown()
+
+	resourceDropDown.SetLabel("Resource: ")
+	resourceDropDown.SetOptions(
+		resourceOptions,
+		func(option string, index int) {
+			*selectedResource = option
+		},
+	)
+
+	resourceDropDown.SetCurrentOption(0)
+	*selectedResource = "EC2"
+
+	// ==================================================
+	// STATUS
+	// ==================================================
+
 	statusView := tview.NewTextView()
 
-	statusView.SetDynamicColors(true)
 	statusView.SetText("Status : Ready")
+	statusView.SetDynamicColors(true)
 
-	// ==========================================
-	// FORM STYLE
-	// ==========================================
-	form.SetBorder(true)
-	form.SetTitle("A9R")
+	// ==================================================
+	// STYLING
+	// ==================================================
 
-	// ==========================================
-	// KEYBOARD
-	// ==========================================
-	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+	dropdowns := []*tview.DropDown{
+		profileDropDown,
+		regionDropDown,
+		resourceDropDown,
+	}
 
-		index, _ := form.GetFocusedItemIndex()
+	for _, d := range dropdowns {
 
-		switch event.Key() {
+		d.SetFieldBackgroundColor(tcell.ColorBlack)
+		d.SetFieldTextColor(tcell.ColorWhite)
+		d.SetLabelColor(tcell.ColorWhite)
 
-		case tcell.KeyEnter:
+		d.SetBackgroundColor(tcell.ColorBlack)
+	}
 
-			if index <= 1 {
-				dropdownOpen = !dropdownOpen
-			}
+	statusView.SetTextColor(tcell.ColorWhite)
+	statusView.SetBackgroundColor(tcell.ColorBlack)
 
-			return event
+	// ==================================================
+	// LEFT COLUMN
+	// ==================================================
 
-		case tcell.KeyDown:
-
-			if dropdownOpen {
-				return event
-			}
-
-			if index < 1 {
-				form.SetFocus(index + 1)
-			}
-
-			return nil
-
-		case tcell.KeyUp:
-
-			if dropdownOpen {
-				return event
-			}
-
-			if index > 0 {
-				form.SetFocus(index - 1)
-			}
-
-			return nil
-
-		case tcell.KeyTAB:
-
-			dropdownOpen = false
-
-			app.SetFocus(table)
-
-			return nil
-		}
-
-		return event
-	})
-
-	// ==========================================
-	// LEFT PANEL
-	// ==========================================
-	leftPanel := tview.NewFlex().
+	leftColumn := tview.NewFlex().
 		SetDirection(tview.FlexRow).
-		AddItem(form, 7, 1, true).
+		AddItem(profileDropDown, 1, 1, true).
+		AddItem(regionDropDown, 1, 1, false)
+
+	// ==================================================
+	// RIGHT COLUMN
+	// ==================================================
+
+	rightColumn := tview.NewFlex().
+		SetDirection(tview.FlexRow).
+		AddItem(resourceDropDown, 1, 1, false).
 		AddItem(statusView, 1, 1, false)
 
-	return leftPanel, form, statusView
+	// ==================================================
+	// MAIN FLEX
+	// ==================================================
+
+	mainFlex := tview.NewFlex().
+		SetDirection(tview.FlexColumn).
+		AddItem(leftColumn, 0, 1, true).
+		AddItem(rightColumn, 0, 1, false)
+
+	mainFlex.SetBorder(true)
+	mainFlex.SetTitle("A9R")
+
+	return mainFlex,
+		profileDropDown,
+		regionDropDown,
+		resourceDropDown,
+		statusView
 }

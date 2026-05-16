@@ -19,6 +19,7 @@ func RefreshTable(
 	state *models.AppState,
 	profile string,
 	region string,
+	resourceType string,
 ) {
 
 	mu.Lock()
@@ -36,15 +37,26 @@ func RefreshTable(
 		statusView.SetText("Status : Loading...")
 	})
 
-	instances := services.GetEC2Instances(
-		ctx,
-		profile,
-		region,
-	)
+	var resource *models.Resource
 
-	resource := BuildEC2Resource(instances)
+	switch resourceType {
+	case "EC2":
+		instanes := services.GetEC2Instances(
+			ctx,
+			profile,
+			region)
+		resource = BuildEC2Resource(instanes)
+
+	case "S3":
+		buckets := services.GetS3Buckets(
+			ctx,
+			profile,
+			region)
+		resource = BuildS3Resource(buckets)
+	}
 
 	state.CurrentResource = resource
+	state.ResourceType = resourceType
 
 	state.CurrentResource.Rows = FilterRows(
 		state.CurrentResource.Rows,

@@ -18,6 +18,7 @@ func main() {
 
 	var selectedProfile string
 	var selectedRegion string
+	var selectedResource string
 
 	autoRefresh := false
 
@@ -31,9 +32,11 @@ func main() {
 	statusBar.SetText(
 		"TAB=switch | /=search | r=refresh | a=auto | q=quit",
 	)
-
+	ui.BindTableKeys(table)
 	leftPanel,
-		form,
+		profileDropDown,
+		regionDropDown,
+		resourceDropDown,
 		statusView := ui.NewForm(
 		app,
 		table,
@@ -41,6 +44,7 @@ func main() {
 		regions,
 		&selectedProfile,
 		&selectedRegion,
+		&selectedResource,
 	)
 
 	layout := ui.NewLayout(
@@ -63,20 +67,18 @@ func main() {
 		)
 	})
 
-	ui.BindTableKeys(
-		app,
-		form,
-		table,
-	)
-
 	ui.BindGlobalKeys(
 		app,
 		table,
+		profileDropDown,
+		regionDropDown,
+		resourceDropDown,
 		statusBar,
 		statusView,
 		state,
 		&selectedProfile,
 		&selectedRegion,
+		&selectedResource,
 		&autoRefresh,
 	)
 
@@ -87,10 +89,11 @@ func main() {
 		state,
 		&selectedProfile,
 		&selectedRegion,
+		&selectedResource,
 		&autoRefresh,
 	)
 
-	app.SetFocus(form)
+	app.SetFocus(profileDropDown)
 
 	if err := app.SetRoot(layout, true).Run(); err != nil {
 		panic(err)
