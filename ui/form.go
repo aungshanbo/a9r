@@ -89,7 +89,7 @@ func NewForm(
 
 	statusView := tview.NewTextView()
 
-	statusView.SetText("Status : Ready")
+	statusView.SetText("Status : Not Updated")
 	statusView.SetDynamicColors(true)
 
 	// ==================================================

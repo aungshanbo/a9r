@@ -7,7 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-func Getbuckets(
+func GetBuckets(
 	ctx context.Context,
 	profile string,
 	region string,

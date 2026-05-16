@@ -45,14 +45,15 @@ func RefreshTable(
 			ctx,
 			profile,
 			region)
-		resource = BuildEC2Resource(instanes)
+		state.EC2Instances = instanes
+		resource = services.BuildEC2Resource(instanes)
 
 	case "S3":
 		buckets := services.GetS3Buckets(
 			ctx,
 			profile,
 			region)
-		resource = BuildS3Resource(buckets)
+		resource = services.BuildS3Resource(buckets)
 	}
 
 	state.CurrentResource = resource

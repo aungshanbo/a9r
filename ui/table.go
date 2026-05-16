@@ -2,6 +2,7 @@ package ui
 
 import (
 	"github.com/aungshanbo/a9r/models"
+	"github.com/aungshanbo/a9r/utils"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
@@ -43,7 +44,7 @@ func DrawTable(
 			tview.NewTableCell(h.Title).
 				SetAttributes(tcell.AttrBold).
 				SetSelectable(false).
-				SetExpansion(1),
+				SetExpansion(h.Expansion),
 		)
 	}
 
@@ -54,11 +55,21 @@ func DrawTable(
 
 		for c, col := range row {
 
+			cell := tview.NewTableCell(col).
+				SetExpansion(headers[c].Expansion)
+
+			// state column color
+			if headers[c].Title == "State" {
+
+				cell.SetTextColor(
+					utils.Getstatecolor(col),
+				)
+			}
+
 			table.SetCell(
 				r+1,
 				c,
-				tview.NewTableCell(col).
-					SetExpansion(1),
+				cell,
 			)
 		}
 	}

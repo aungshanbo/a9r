@@ -29,10 +29,10 @@ func main() {
 	statusBar.SetBorder(true)
 	statusBar.SetTitle("Help")
 
-	statusBar.SetText(
-		"TAB=switch | /=search | r=refresh | a=auto | q=quit",
-	)
-	ui.BindTableKeys(table)
+	/*statusBar.SetText(
+		"TAB=switch | J=json | /=search | r=refresh | a=auto | q=quit",
+	)*/
+
 	leftPanel,
 		profileDropDown,
 		regionDropDown,
@@ -53,19 +53,24 @@ func main() {
 		statusBar,
 	)
 
-	table.SetSelectedFunc(func(row, column int) {
+	pages := tview.NewPages()
 
-		if row == 0 {
-			return
-		}
+	pages.AddPage(
+		"main",
+		layout,
+		true,
+		true,
+	)
 
-		ui.ShowInstanceModal(
-			app,
-			layout,
-			table,
-			row,
-		)
-	})
+	ui.BindTableKeys(
+		app,
+		table,
+		pages,
+		state,
+		&selectedProfile,
+		&selectedRegion,
+		&selectedResource,
+	)
 
 	ui.BindGlobalKeys(
 		app,
@@ -95,7 +100,7 @@ func main() {
 
 	app.SetFocus(profileDropDown)
 
-	if err := app.SetRoot(layout, true).Run(); err != nil {
+	if err := app.SetRoot(pages, true).Run(); err != nil {
 		panic(err)
 	}
 }

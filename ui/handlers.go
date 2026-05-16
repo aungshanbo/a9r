@@ -1,46 +1,88 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	"github.com/aungshanbo/a9r/aws"
 	"github.com/aungshanbo/a9r/models"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
 
 func BindTableKeys(
+	app *tview.Application,
 	table *tview.Table,
+	pages *tview.Pages,
+	state *models.AppState,
+	selectedProfile *string,
+	selectedRegion *string,
+	selectedResource *string,
 ) {
 
 	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 
-		switch {
+		switch event.Rune() {
 
-		// allow "/" to global handler
-		case event.Rune() == '/':
+		// JSON viewer
+		case 'j':
 
-			return event
+			row, _ := table.GetSelection()
 
-		// move down
-		case event.Rune() == 'j',
-			event.Key() == tcell.KeyDown:
+			if row == 0 {
+				return nil
+			}
 
-			moveTableDown(table)
-			return nil
+			if *selectedResource != "EC2" {
+				return nil
+			}
 
-		// move up
-		case event.Rune() == 'k',
-			event.Key() == tcell.KeyUp:
+			index := row - 1
 
-			moveTableUp(table)
+			if index >= len(state.EC2Instances) {
+				return nil
+			}
+
+			instance := state.EC2Instances[index]
+
+			go func() {
+
+				detail := aws.GetEC2Detail(
+					context.Background(),
+					*selectedProfile,
+					*selectedRegion,
+					instance.ID,
+				)
+
+				if detail == nil {
+					return
+				}
+
+				title := instance.Name
+
+				if title == "" {
+					title = instance.ID
+				}
+
+				app.QueueUpdateDraw(func() {
+
+					ShowJSONViewer(
+						app,
+						pages,
+						table,
+						title,
+						detail,
+					)
+				})
+			}()
+
 			return nil
 		}
 
 		return event
 	})
 }
-
 func BindGlobalKeys(
 	app *tview.Application,
 	table *tview.Table,
@@ -64,10 +106,10 @@ func BindGlobalKeys(
 
 		statusBar.SetDynamicColors(true)
 
-		left := "TAB=switch | /=search | r=refresh | a=auto | q=quit"
+		left := "TAB=switch | j=json | /=search | r=refresh | a=auto | q=quit"
 
 		if *autoRefresh {
-			left = "Auto: ON | TAB=switch | /=search | r=refresh | q=quit"
+			left = "Auto: ON | TAB=switch | j=json | /=search | r=refresh | a=auto-off | q=quit"
 		}
 
 		if searchMode {
@@ -163,7 +205,16 @@ func BindGlobalKeys(
 			resourceDropDown,
 			table,
 		}
+		currentFocus := app.GetFocus()
 
+		// ignore global keys while modal/detail view focused
+		if currentFocus != table &&
+			currentFocus != profileDropDown &&
+			currentFocus != regionDropDown &&
+			currentFocus != resourceDropDown {
+
+			return event
+		}
 		if event.Key() == tcell.KeyTAB {
 
 			current := app.GetFocus()
