@@ -20,7 +20,7 @@ func main() {
 	var selectedRegion string
 	var selectedResource string
 
-	autoRefresh := false
+	autoRefresh := true
 
 	table := ui.NewTable()
 
