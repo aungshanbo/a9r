@@ -16,4 +16,5 @@ type AppState struct {
 	Filter          string
 	ResourceType    string
 	EC2Instances    []Ec2instance
+	S3Buckets []S3Bucket
 }

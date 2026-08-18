@@ -23,58 +23,186 @@ func BindTableKeys(
 
 	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 
-		switch event.Rune() {
+		row, _ := table.GetSelection()
 
-		// JSON viewer
-		case 'j':
+		switch {
 
-			row, _ := table.GetSelection()
+		// ==========================================
+		// JSON VIEWER
+		// ==========================================
 
-			if row == 0 {
+		case event.Rune() == 'j':
+
+			if row <= 0 {
 				return nil
 			}
 
-			if *selectedResource != "EC2" {
+			switch *selectedResource {
+
+			case "EC2":
+
+				index := row - 1
+
+				if index < 0 ||
+					index >= len(state.EC2Instances) {
+					return nil
+				}
+
+				instance := state.EC2Instances[index]
+
+				go func() {
+
+					detail := aws.GetEC2Detail(
+						context.Background(),
+						*selectedProfile,
+						*selectedRegion,
+						instance.ID,
+					)
+
+					if detail == nil {
+						return
+					}
+
+					title := instance.Name
+
+					if title == "" {
+						title = instance.ID
+					}
+
+					app.QueueUpdateDraw(func() {
+
+						ShowJSONViewer(
+							app,
+							pages,
+							table,
+							title,
+							detail,
+						)
+					})
+				}()
+
+				return nil
+
+			case "S3":
+
+				index := row - 1
+
+				if index < 0 ||
+					index >= len(state.S3Buckets) {
+					return nil
+				}
+
+				bucket := state.S3Buckets[index]
+
+				go func() {
+
+					detail := aws.GetS3BucketDetail(
+						context.Background(),
+						*selectedProfile,
+						*selectedRegion,
+						bucket.Name,
+					)
+
+					if detail == nil {
+						return
+					}
+
+					detail.CreationDate =
+						bucket.CreationDate
+
+					app.QueueUpdateDraw(func() {
+
+						ShowJSONViewer(
+							app,
+							pages,
+							table,
+							bucket.Name,
+							detail,
+						)
+					})
+				}()
+
+				return nil
+			}
+
+		// ==========================================
+		// ENTER - S3 DETAIL
+		// ==========================================
+
+		case event.Key() == tcell.KeyEnter:
+
+			if *selectedResource != "S3" {
+				return nil
+			}
+
+			if row <= 0 {
 				return nil
 			}
 
 			index := row - 1
 
-			if index >= len(state.EC2Instances) {
+			if index < 0 ||
+				index >= len(state.S3Buckets) {
 				return nil
 			}
 
-			instance := state.EC2Instances[index]
+			bucket := state.S3Buckets[index]
+
+			// ======================================
+			// SHOW LOADING IMMEDIATELY
+			// ======================================
+
+			ShowLoading(
+				app,
+				pages,
+				table,
+				bucket.Name,
+			)
+
+			// ======================================
+			// BACKGROUND - BUCKET METADATA
+			// ======================================
 
 			go func() {
 
-				detail := aws.GetEC2Detail(
+				detail := aws.GetS3BucketDetail(
 					context.Background(),
 					*selectedProfile,
 					*selectedRegion,
-					instance.ID,
+					bucket.Name,
 				)
 
 				if detail == nil {
+
+					app.QueueUpdateDraw(func() {
+
+						pages.RemovePage("loading")
+						app.SetFocus(table)
+					})
+
 					return
 				}
 
-				title := instance.Name
+				detail.CreationDate =
+					bucket.CreationDate
 
-				if title == "" {
-					title = instance.ID
-				}
+				// ==================================
+				// SHOW DETAIL UI
+				// ==================================
 
 				app.QueueUpdateDraw(func() {
 
-					ShowJSONViewer(
+					pages.RemovePage("loading")
+
+					ShowS3Detail(
 						app,
 						pages,
 						table,
-						title,
+						*selectedProfile,
 						detail,
 					)
 				})
+
 			}()
 
 			return nil
@@ -83,6 +211,7 @@ func BindTableKeys(
 		return event
 	})
 }
+
 func BindGlobalKeys(
 	app *tview.Application,
 	table *tview.Table,
@@ -97,11 +226,14 @@ func BindGlobalKeys(
 	selectedResource *string,
 	autoRefresh *bool,
 ) {
+
 	searchMode := false
 	var searchTimer *time.Timer
+
 	// ==========================================
 	// STATUS BAR
 	// ==========================================
+
 	updateStatusBar := func() {
 
 		statusBar.SetDynamicColors(true)
@@ -121,11 +253,17 @@ func BindGlobalKeys(
 			return
 		}
 
-		right := fmt.Sprintf("Search: %s", state.Filter)
+		right := fmt.Sprintf(
+			"Search: %s",
+			state.Filter,
+		)
 
 		_, _, width, _ := statusBar.GetInnerRect()
 
-		padding := width - len(left) - len(right)
+		padding :=
+			width -
+				len(left) -
+				len(right)
 
 		if padding < 1 {
 			padding = 1
@@ -133,7 +271,11 @@ func BindGlobalKeys(
 
 		statusBar.SetText(
 			left +
-				fmt.Sprintf("%*s", padding, "") +
+				fmt.Sprintf(
+					"%*s",
+					padding,
+					"",
+				) +
 				right,
 		)
 	}
@@ -141,6 +283,7 @@ func BindGlobalKeys(
 	// ==========================================
 	// DRAW FILTERED TABLE
 	// ==========================================
+
 	drawFilteredTable := func() {
 
 		if state.CurrentResource == nil {
@@ -166,6 +309,7 @@ func BindGlobalKeys(
 	// ==========================================
 	// EXIT SEARCH MODE
 	// ==========================================
+
 	exitSearchMode := func(clear bool) {
 
 		searchMode = false
@@ -176,7 +320,6 @@ func BindGlobalKeys(
 
 		updateStatusBar()
 
-		// immediate refresh
 		if *selectedProfile != "" &&
 			*selectedRegion != "" {
 
@@ -194,193 +337,203 @@ func BindGlobalKeys(
 
 	updateStatusBar()
 
-	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		// ==========================================
-		// TAB switch
-		// ==========================================
+	app.SetInputCapture(
+		func(event *tcell.EventKey) *tcell.EventKey {
 
-		focusables := []tview.Primitive{
-			profileDropDown,
-			regionDropDown,
-			resourceDropDown,
-			table,
-		}
-		currentFocus := app.GetFocus()
+			// ======================================
+			// TAB
+			// ======================================
 
-		// ignore global keys while modal/detail view focused
-		if currentFocus != table &&
-			currentFocus != profileDropDown &&
-			currentFocus != regionDropDown &&
-			currentFocus != resourceDropDown {
-
-			return event
-		}
-		if event.Key() == tcell.KeyTAB {
-
-			current := app.GetFocus()
-
-			for i, item := range focusables {
-
-				if current == item {
-
-					next := (i + 1) % len(focusables)
-
-					app.SetFocus(focusables[next])
-
-					return nil
-				}
-			}
-		}
-
-		// ==========================================
-		// SEARCH MODE
-		// ==========================================
-		if searchMode {
-
-			switch {
-			// clear + exit
-			case event.Key() == tcell.KeyEsc:
-
-				exitSearchMode(true)
-				return nil
-
-			// move down
-			case event.Rune() == 'j',
-				event.Key() == tcell.KeyDown:
-
-				moveTableDown(table)
-				return nil
-
-			// move up
-			case event.Rune() == 'k',
-				event.Key() == tcell.KeyUp:
-
-				moveTableUp(table)
-				return nil
-
-			// backspace
-			case event.Key() == tcell.KeyBackspace,
-				event.Key() == tcell.KeyBackspace2:
-
-				if len(state.Filter) > 0 {
-					state.Filter = state.Filter[:len(state.Filter)-1]
-				}
-
-				if searchTimer != nil {
-					searchTimer.Stop()
-				}
-
-				searchTimer = time.AfterFunc(
-					120*time.Millisecond,
-					func() {
-						app.QueueUpdateDraw(func() {
-							drawFilteredTable()
-						})
-					},
-				)
-				updateStatusBar()
-
-				return nil
+			focusables := []tview.Primitive{
+				profileDropDown,
+				regionDropDown,
+				resourceDropDown,
+				table,
 			}
 
-			// typing
-			if event.Rune() != 0 {
+			currentFocus := app.GetFocus()
 
-				state.Filter += string(event.Rune())
+			if currentFocus != table &&
+				currentFocus != profileDropDown &&
+				currentFocus != regionDropDown &&
+				currentFocus != resourceDropDown {
 
-				updateStatusBar()
-
-				if searchTimer != nil {
-					searchTimer.Stop()
-				}
-
-				searchTimer = time.AfterFunc(
-					120*time.Millisecond,
-					func() {
-						app.QueueUpdateDraw(func() {
-							drawFilteredTable()
-						})
-					},
-				)
-
-				return nil
-			}
-
-			return nil
-		}
-
-		// ==========================================
-		// NORMAL MODE
-		// ==========================================
-		switch {
-
-		// quit
-		case event.Rune() == 'q':
-
-			app.Stop()
-			return nil
-
-		// refresh
-		case event.Rune() == 'r':
-
-			if *selectedProfile != "" &&
-				*selectedRegion != "" {
-
-				go RefreshTable(
-					app,
-					table,
-					statusView,
-					state,
-					*selectedProfile,
-					*selectedRegion,
-					*selectedResource,
-				)
-			}
-
-			return nil
-
-		// search mode
-		case event.Rune() == '/':
-
-			if app.GetFocus() != table {
 				return event
 			}
 
-			searchMode = true
-			state.Filter = ""
+			if event.Key() == tcell.KeyTAB {
 
-			updateStatusBar()
+				current := app.GetFocus()
 
-			return nil
+				for i, item := range focusables {
 
-		// auto refresh
-		case event.Rune() == 'a':
+					if current == item {
 
-			*autoRefresh = !*autoRefresh
+						next :=
+							(i + 1) %
+								len(focusables)
 
-			updateStatusBar()
+						app.SetFocus(
+							focusables[next],
+						)
 
-			// instant refresh
-			if *autoRefresh &&
-				*selectedProfile != "" &&
-				*selectedRegion != "" {
-
-				go RefreshTable(
-					app,
-					table,
-					statusView,
-					state,
-					*selectedProfile,
-					*selectedRegion,
-					*selectedResource,
-				)
+						return nil
+					}
+				}
 			}
 
-			return nil
-		}
+			// ======================================
+			// SEARCH MODE
+			// ======================================
 
-		return event
-	})
+			if searchMode {
+
+				switch {
+
+				case event.Key() == tcell.KeyEsc:
+
+					exitSearchMode(true)
+					return nil
+
+				case event.Rune() == 'j',
+					event.Key() == tcell.KeyDown:
+
+					moveTableDown(table)
+					return nil
+
+				case event.Rune() == 'k',
+					event.Key() == tcell.KeyUp:
+
+					moveTableUp(table)
+					return nil
+
+				case event.Key() == tcell.KeyBackspace,
+					event.Key() == tcell.KeyBackspace2:
+
+					if len(state.Filter) > 0 {
+						state.Filter =
+							state.Filter[:len(state.Filter)-1]
+					}
+
+					if searchTimer != nil {
+						searchTimer.Stop()
+					}
+
+					searchTimer = time.AfterFunc(
+						120*time.Millisecond,
+						func() {
+
+							app.QueueUpdateDraw(
+								func() {
+									drawFilteredTable()
+								},
+							)
+						},
+					)
+
+					updateStatusBar()
+
+					return nil
+				}
+
+				if event.Rune() != 0 {
+
+					state.Filter +=
+						string(event.Rune())
+
+					updateStatusBar()
+
+					if searchTimer != nil {
+						searchTimer.Stop()
+					}
+
+					searchTimer = time.AfterFunc(
+						120*time.Millisecond,
+						func() {
+
+							app.QueueUpdateDraw(
+								func() {
+									drawFilteredTable()
+								},
+							)
+						},
+					)
+
+					return nil
+				}
+
+				return nil
+			}
+
+			// ======================================
+			// NORMAL MODE
+			// ======================================
+
+			switch {
+
+			case event.Rune() == 'q':
+
+				app.Stop()
+				return nil
+
+			case event.Rune() == 'r':
+
+				if *selectedProfile != "" &&
+					*selectedRegion != "" {
+
+					go RefreshTable(
+						app,
+						table,
+						statusView,
+						state,
+						*selectedProfile,
+						*selectedRegion,
+						*selectedResource,
+					)
+				}
+
+				return nil
+
+			case event.Rune() == '/':
+
+				if app.GetFocus() != table {
+					return event
+				}
+
+				searchMode = true
+				state.Filter = ""
+
+				updateStatusBar()
+
+				return nil
+
+			case event.Rune() == 'a':
+
+				*autoRefresh = !*autoRefresh
+
+				updateStatusBar()
+
+				if *autoRefresh &&
+					*selectedProfile != "" &&
+					*selectedRegion != "" {
+
+					go RefreshTable(
+						app,
+						table,
+						statusView,
+						state,
+						*selectedProfile,
+						*selectedRegion,
+						*selectedResource,
+					)
+				}
+
+				return nil
+			}
+
+			return event
+		},
+	)
 }
 
 func StartAutoRefresh(
@@ -422,14 +575,18 @@ func moveTableDown(table *tview.Table) {
 
 	r, c := table.GetSelection()
 
-	maxRow := table.GetRowCount() - 1
+	maxRow :=
+		table.GetRowCount() - 1
 
 	if maxRow < 1 {
 		return
 	}
 
 	if r < maxRow {
-		table.Select(r+1, c)
+		table.Select(
+			r+1,
+			c,
+		)
 	}
 }
 
@@ -438,6 +595,9 @@ func moveTableUp(table *tview.Table) {
 	r, c := table.GetSelection()
 
 	if r > 1 {
-		table.Select(r-1, c)
+		table.Select(
+			r-1,
+			c,
+		)
 	}
 }
