@@ -133,7 +133,7 @@ func ShowS3Detail(
 
 	pages.AddPage(
 		"s3-detail",
-		text,
+		Center(100, 30, text),
 		true,
 		true,
 	)
