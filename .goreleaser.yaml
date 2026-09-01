@@ -1,0 +1,42 @@
+version: 2
+
+project_name: a9r
+
+builds:
+  - id: a9r
+    main: .
+    binary: a9r
+
+    env:
+      - CGO_ENABLED=0
+
+    goos:
+      - darwin
+      - linux
+
+    goarch:
+      - arm64
+      - amd64
+
+archives:
+  - formats:
+      - tar.gz
+
+checksum:
+  name_template: "checksums.txt"
+
+brews:
+  - repository:
+      owner: aungshanbo
+      name: homebrew-tap
+
+    name: a9r
+
+    homepage: "https://github.com/aungshanbo/a9r"
+
+    description: "AWS resource manager TUI"
+
+    license: "MIT"
+
+    install: |
+      bin.install "a9r"
